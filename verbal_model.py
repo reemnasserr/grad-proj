@@ -12,11 +12,11 @@ from tensorflow.keras.optimizers import Adam
 import json
 
 
-data_directory_path = 'Data/Transcript/Segmented/'
+data_directory_path = 'Raw\Transcript\Segmented'
 filenames = os.listdir(data_directory_path)
-labels = pd.read_csv('labels.csv')
-glove_path = 'glove.840B.300d.txt'
-checkpoint_path= 'D:\DarkSide\Graduation project'
+labels = pd.read_csv('updated_labels.csv')
+glove_path = '.\glove.840B.300d\glove.840B.300d.txt'
+checkpoint_path= './checkpoints/my_checkpoint'
 
 data = []
 targets = []
@@ -45,7 +45,7 @@ def pretrained_embeddings(file_path, EMBEDDING_DIM, VOCAB_SIZE, word2idx):
 
 for filename in filenames:
     lines = []
-    with open(data_directory_path + filename, 'r') as f:
+    with open(os.path.join(data_directory_path, filename) , 'r') as f:
         lines = f.readlines()
     
     for index, line in enumerate(lines):
@@ -60,23 +60,30 @@ for filename in filenames:
 
 targets = np.array(targets) 
 
+# Uploading most frequent 10000 words in english 
+
+most_frequent_10000_words = []
+with open(os.path.join('D:\Abdelrhman\Graduatoin project', 'google-10000-english.txt'),  errors='ignore', encoding='utf8') as f:
+        for line in f:
+            most_frequent_10000_words.append(line.strip())
+
 # preprocess the data 
 
-tokenizer = Tokenizer(num_words= 3150, filters= '')
-tokenizer.fit_on_texts(data)
+tokenizer = Tokenizer(num_words= 13200, filters= '')
+# fit the tokenizer on most frequent 10000 words in english  and words in dataset
+tokenizer.fit_on_texts(most_frequent_10000_words+data) 
 seq = tokenizer.texts_to_sequences(data)
 seq_padded = pad_sequences(seq, padding= 'post')
 tokenizer_config = tokenizer.get_config()
 word_index = json.loads(tokenizer_config['word_index'])
 
-embedding_matrix = pretrained_embeddings(glove_path, 300, 3150, word_index)
+embedding_matrix = pretrained_embeddings(glove_path, 300, 13200, word_index)
 
 
 model = Sequential([
-        Embedding(input_dim= 3150, output_dim= 300, mask_zero= True, 
+        Embedding(input_dim= 13200, output_dim= 300, mask_zero= True, 
                   embeddings_initializer=tf.keras.initializers.Constant(embedding_matrix),
                   trainable=False),
-        LSTM(64, return_sequences=True),
         LSTM(64),
         Dropout(.4),
         Dense(32, activation= 'relu'),
@@ -90,7 +97,7 @@ model.summary()
 model.compile(optimizer= Adam(0.0001), loss= 'binary_crossentropy', metrics= ['accuracy'])
 save_waights = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,save_weights_only=True,verbose=1)
 
-history = model.fit(x= seq_padded, y= targets, batch_size= 32, epochs= 20, validation_split= 0.15,
+history = model.fit(x= seq_padded, y= targets, batch_size= 64, epochs= 10, validation_split= 0.15,
                     callbacks=[save_waights])
 
 
